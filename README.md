@@ -13,7 +13,14 @@ The high level architecture looks like:
 │                      upload key (secret)                    │││
 │                              V                              │││
 │           mount  ┌─────────────────────┐ rsync to beehive   │││
-│ /uploads ------> │ Node Upload Manager │ -------------------│-->
+│ /uploads ------> │ Node Upload Manager │ ---------------------->
 │                  └─────────────────────┘                    │┘
 └─────────────────────────────────────────────────────────────┘
 ```
+
+## Usage
+
+This services expects the following things:
+
+1. A directory `/uploads` must be mounted with RW access. Items of the form `/uploads/x/y` will be moved to beehive.
+2. An ssh key located at `/auth/ssh-key` for the remote ssh server.
