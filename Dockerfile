@@ -1,4 +1,4 @@
 FROM alpine
 RUN apk add rsync
-COPY node-upload-manager.sh node-upload-manager.sh
-CMD ["sh", "node-upload-manager.sh"]
+COPY node-upload-agent.sh node-upload-agent.sh
+CMD ["sh", "node-upload-agent.sh"]

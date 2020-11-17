@@ -1,6 +1,6 @@
-# Node Upload Manager
+# Node Upload Agent
 
-This service is responsible for uploading the data plugins have staged locally.
+The upload agent is responsible for moving the data plugins have staged locally to beehive.
 
 The high level architecture looks like:
 
@@ -12,9 +12,9 @@ The high level architecture looks like:
 │                                                             │││
 │                      upload key (secret)                    │││
 │                              V                              │││
-│           mount  ┌─────────────────────┐ rsync to beehive   │││
-│ /uploads ------> │ Node Upload Manager │ ---------------------->
-│                  └─────────────────────┘                    │┘
+│           mount  ┌───────────────────┐   rsync to beehive   │││
+│ /uploads ------> │ Node Upload Agent │ ---------------------->
+│                  └───────────────────┘                      │┘
 └─────────────────────────────────────────────────────────────┘
 ```
 
