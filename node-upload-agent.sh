@@ -33,7 +33,7 @@ while true; do
     --partial-dir=.partial/ \
     --timeout=120 \
     --bwlimit=0 \
-    "/uploads" \
+    "/uploads/" \
     "node${WAGGLE_NODE_ID}@${WAGGLE_UPLOAD_HOST}:~/uploads/"
 
     sleep 60
