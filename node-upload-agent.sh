@@ -26,17 +26,20 @@ fi
 sleep 10
 
 while true; do
+    # update liveness probes
+    touch /tmp/healthy
+
     numfiles=$(find /uploads -type f | grep -v .tmp | wc -l)
     echo $numfiles "files found"
 
     if [ $numfiles -gt 0 ]; then
         echo "uploading files"
         rsync -a \
-        -e "ssh -i /etc/waggle/ssh-key -o BatchMode=yes" \
+        -e "ssh -i /etc/waggle/ssh-key -o BatchMode=yes -o ConnectTimeout=30" \
         --exclude '.tmp*' \
         --remove-source-files \
         --partial-dir=.partial/ \
-        --timeout=120 \
+        --timeout=300 \
         --bwlimit=0 \
         "/uploads/" \
         "node${WAGGLE_NODE_ID}@${WAGGLE_UPLOAD_HOST}:~/uploads/"
