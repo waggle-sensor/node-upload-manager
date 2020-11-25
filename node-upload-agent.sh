@@ -9,9 +9,22 @@ if [ -z "$WAGGLE_NODE_ID" ]; then
     fatal "WAGGLE_NODE_ID is not defined"
 fi
 
-if [ -z "$BEEHIVE_UPLOAD_SERVER_SERVICE_HOST" ]; then
-    fatal "BEEHIVE_UPLOAD_SERVER_SERVICE_HOST is not defined"
-fi
+# TODO Investigate how we should use BEEHIVE_UPLOAD_SERVER_SERVICE_HOST.
+# By default, we'll assume beehive-upload-server exists in the DNS via
+# a Kubernetes ExternalName Service or /etc/hosts.
+#
+# Currently, Kubernetes resolves this env var to an IP address and seem to
+# mess up the host key check and shows this error:
+# Certificate invalid: name is not a listed principal
+# Host key verification failed.
+#
+# I've tried all comobnations of adding HostName ${BEEHIVE_UPLOAD_SERVER_SERVICE_HOST}
+# to the ssh config and adding it as a principle to the known_hosts file. Removing it
+# and just using beehive-upload-server is the only thing I found that works.
+#
+# if [ -z "$BEEHIVE_UPLOAD_SERVER_SERVICE_HOST" ]; then
+#     fatal "BEEHIVE_UPLOAD_SERVER_SERVICE_HOST is not defined"
+# fi
 
 if [ -z "$BEEHIVE_UPLOAD_SERVER_SERVICE_PORT" ]; then
     fatal "BEEHIVE_UPLOAD_SERVER_SERVICE_PORT is not defined"
@@ -22,7 +35,6 @@ mkdir -p /root/.ssh/
 # define ssh config
 cat <<EOF > /root/.ssh/config
 Host beehive-upload-server
-    HostName ${BEEHIVE_UPLOAD_SERVER_SERVICE_HOST}
     Port ${BEEHIVE_UPLOAD_SERVER_SERVICE_PORT}
     User node${WAGGLE_NODE_ID}
     IdentityFile /etc/waggle/ssh-key
@@ -33,7 +45,7 @@ Host beehive-upload-server
 EOF
 
 # define ssh known_hosts
-if ! echo "@cert-authority * $(cat /etc/waggle/ca.pub)" > /root/.ssh/known_hosts; then
+if ! echo "@cert-authority beehive-upload-server $(cat /etc/waggle/ca.pub)" > /root/.ssh/known_hosts; then
     fatal "could not read CA certificate or create known_hosts file"
 fi
 
