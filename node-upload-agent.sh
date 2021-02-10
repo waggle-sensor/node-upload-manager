@@ -26,17 +26,20 @@ fi
 #     fatal "BEEHIVE_UPLOAD_SERVER_SERVICE_HOST is not defined"
 # fi
 
-if [ -z "$BEEHIVE_UPLOAD_SERVER_SERVICE_PORT" ]; then
-    fatal "BEEHIVE_UPLOAD_SERVER_SERVICE_PORT is not defined"
+if [ -z "$WAGGLE_BEEHIVE_UPLOAD_PORT" ]; then
+    fatal "WAGGLE_BEEHIVE_UPLOAD_PORT is not defined"
 fi
 
 mkdir -p /root/.ssh/
+
+# get username from ssh cert
+username=$(ssh-keygen -L -f /etc/waggle/ssh-key-cert.pub | awk '/node-/ {print $1}')
 
 # define ssh config
 cat <<EOF > /root/.ssh/config
 Host beehive-upload-server
     Port ${BEEHIVE_UPLOAD_SERVER_SERVICE_PORT}
-    User node${WAGGLE_NODE_ID}
+    User ${username}
     IdentityFile /etc/waggle/ssh-key
     CertificateFile /etc/waggle/ssh-key-cert.pub
     BatchMode yes
