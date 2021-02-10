@@ -34,11 +34,12 @@ mkdir -p /root/.ssh/
 
 # get username from ssh cert
 username=$(ssh-keygen -L -f /etc/waggle/ssh-key-cert.pub | awk '/node-/ {print $1}')
+echo "using username ${username}"
 
 # define ssh config
 cat <<EOF > /root/.ssh/config
 Host beehive-upload-server
-    Port ${BEEHIVE_UPLOAD_SERVER_SERVICE_PORT}
+    Port ${WAGGLE_BEEHIVE_UPLOAD_PORT}
     User ${username}
     IdentityFile /etc/waggle/ssh-key
     CertificateFile /etc/waggle/ssh-key-cert.pub
