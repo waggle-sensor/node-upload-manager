@@ -1,9 +1,6 @@
 #!/bin/bash
 
-fatal() {
-    echo $*
-    exit 1
-}
+. common.sh
 
 if [ -z "$WAGGLE_NODE_ID" ]; then
     fatal "WAGGLE_NODE_ID is not defined"
@@ -35,8 +32,14 @@ Host beehive-upload-server
     LogLevel VERBOSE
 EOF
 
+if ! hostip=$(resolve_host_ip); then
+    fatal "unable to resolve host ip for $WAGGLE_BEEHIVE_UPLOAD_HOST"
+fi
+
+echo "resolved $WAGGLE_BEEHIVE_UPLOAD_HOST to $hostip"
+
 # workaround for "Host key verification failed" error
-echo "$WAGGLE_BEEHIVE_UPLOAD_HOST beehive-upload-server" >> /etc/hosts
+echo "$hostip beehive-upload-server" >> /etc/hosts
 
 # define ssh known_hosts
 if ! echo "@cert-authority beehive-upload-server $(cat /etc/waggle/ca.pub)" > /root/.ssh/known_hosts; then
