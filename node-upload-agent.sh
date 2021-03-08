@@ -32,7 +32,7 @@ Host beehive-upload-server
     LogLevel VERBOSE
 EOF
 
-if ! hostip=$(resolve_host_ip); then
+if ! hostip=$(resolve_host_ip "$WAGGLE_BEEHIVE_UPLOAD_HOST"); then
     fatal "unable to resolve host ip for $WAGGLE_BEEHIVE_UPLOAD_HOST"
 fi
 
