@@ -26,7 +26,24 @@ echo "ssh key ${SSH_KEY}"
 echo "ssh cert ${SSH_CERT}"
 
 # get username from ssh cert
-username=$(ssh-keygen -L -f "${SSH_CERT}" | awk '/node-/ {print $1}')
+# TODO(sean) make this match more robust. output looks like:
+# /etc/waggle/ssh-key-cert.pub:
+#         Type: ssh-rsa-cert-v01@openssh.com user certificate
+#         Public key: RSA-CERT SHA256:i5Orb/PHT1rM7Mq6mM/m366tnPVaIzGXDr0Ras9PRbE
+#         Signing CA: RSA SHA256:XxSyeGs55EKetdO+31XLgz/fGbAk7v/S57ChRPhibgo (using rsa-sha2-256)
+#         Key ID: "node-0000000000000001 ssh host key"
+#         Serial: 0
+#         Valid: from 2021-03-22T21:09:04 to 2022-03-22T21:14:04
+#         Principals: 
+#                 node-0000000000000001
+#         Critical Options: (none)
+#         Extensions: 
+#                 permit-X11-forwarding
+#                 permit-agent-forwarding
+#                 permit-port-forwarding
+#                 permit-pty
+#                 permit-user-rc
+username=$(ssh-keygen -L -f "${SSH_CERT}" | awk '$1 ~ /^node-/ {print $1}')
 echo "using username ${username}"
 
 # define ssh config
