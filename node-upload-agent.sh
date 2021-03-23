@@ -20,10 +20,10 @@ SSH_CA_PUBKEY="${SSH_CA_PUBKEY:-/etc/waggle/ca.pub}"
 SSH_KEY="${SSH_KEY:-/etc/waggle/ssh-key}"
 SSH_CERT="${SSH_CERT:-/etc/waggle/ssh-key-cert.pub}"
 
-echo "credential paths"
-echo "ssh ca pubkey ${SSH_CA_PUBKEY}"
-echo "ssh key ${SSH_KEY}"
-echo "ssh cert ${SSH_CERT}"
+echo "using credentials"
+echo "ssh ca pubkey: ${SSH_CA_PUBKEY}"
+echo "ssh key: ${SSH_KEY}"
+echo "ssh cert: ${SSH_CERT}"
 
 # get username from ssh cert
 # TODO(sean) make this match more robust. output looks like:
