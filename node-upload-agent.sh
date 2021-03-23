@@ -16,8 +16,17 @@ fi
 
 mkdir -p /root/.ssh/
 
+SSH_CA_PUBKEY="${SSH_CA_PUBKEY:-/etc/waggle/ca.pub}"
+SSH_KEY="${SSH_KEY:-/etc/waggle/ssh-key}"
+SSH_CERT="${SSH_CERT:-/etc/waggle/ssh-key-cert.pub}"
+
+echo "credential paths"
+echo "ssh ca pubkey ${SSH_CA_PUBKEY}"
+echo "ssh key ${SSH_KEY}"
+echo "ssh cert ${SSH_CERT}"
+
 # get username from ssh cert
-username=$(ssh-keygen -L -f /etc/waggle/ssh-key-cert.pub | awk '/node-/ {print $1}')
+username=$(ssh-keygen -L -f "${SSH_CERT}" | awk '/node-/ {print $1}')
 echo "using username ${username}"
 
 # define ssh config
@@ -25,8 +34,8 @@ cat <<EOF > /root/.ssh/config
 Host beehive-upload-server
     Port ${WAGGLE_BEEHIVE_UPLOAD_PORT}
     User ${username}
-    IdentityFile /etc/waggle/ssh-key
-    CertificateFile /etc/waggle/ssh-key-cert.pub
+    IdentityFile ${SSH_KEY}
+    CertificateFile ${SSH_CERT}
     BatchMode yes
     ConnectTimeout 30
     LogLevel VERBOSE
@@ -42,7 +51,7 @@ echo "resolved $WAGGLE_BEEHIVE_UPLOAD_HOST to $hostip"
 echo "$hostip beehive-upload-server" >> /etc/hosts
 
 # define ssh known_hosts
-if ! echo "@cert-authority beehive-upload-server $(cat /etc/waggle/ca.pub)" > /root/.ssh/known_hosts; then
+if ! echo "@cert-authority beehive-upload-server $(cat ${SSH_CA_PUBKEY})" > /root/.ssh/known_hosts; then
     fatal "could not read CA certificate or create known_hosts file"
 fi
 
