@@ -84,6 +84,7 @@ while true; do
         echo "rsyncing $numfiles file(s)"
         rsync -av \
         --exclude '.tmp*' \
+        --prune-empty-dirs \
         --remove-source-files \
         --partial-dir=.partial/ \
         --bwlimit=0 \
