@@ -113,7 +113,7 @@ upload_files() {
 
     echo "resolving upload server address"
     if ! resolve_upload_server_and_update_etc_hosts; then
-        echo "failed to resolve upload server and update /etc/hosts. retrying..."
+        echo "failed to resolve upload server and update /etc/hosts."
         return 1
     fi
 
