@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -e
 
 . common.sh
 
@@ -58,31 +58,40 @@ Host beehive-upload-server
     LogLevel VERBOSE
 EOF
 
-if ! hostip=$(resolve_host_ip "$WAGGLE_BEEHIVE_UPLOAD_HOST"); then
-    fatal "unable to resolve host ip for $WAGGLE_BEEHIVE_UPLOAD_HOST"
-fi
+# NOTE workaround for "Host key verification failed" issue. at the moment, this seems to be because
+# our upload server ssh cert uses name "beehive-upload-server". eventually, this should be updated
+# to use the actual hostname of the upload server.
 
-echo "resolved $WAGGLE_BEEHIVE_UPLOAD_HOST to $hostip"
+# create backup of original /etc/hosts file
+# NOTE used by the resolve_upload_server_and_update_etc_hosts function below.
+cp /etc/hosts /tmp/hosts
 
-# workaround for "Host key verification failed" error
-echo "$hostip beehive-upload-server" >> /etc/hosts
+resolve_upload_server_and_update_etc_hosts() {
+    if ! hostip=$(resolve_host_ip "$WAGGLE_BEEHIVE_UPLOAD_HOST"); then
+        echo "unable to resolve host ip for $WAGGLE_BEEHIVE_UPLOAD_HOST"
+        return 1
+    fi
 
-# define ssh known_hosts
-if ! echo "@cert-authority beehive-upload-server $(cat ${SSH_CA_PUBKEY})" > /root/.ssh/known_hosts; then
-    fatal "could not read CA certificate or create known_hosts file"
-fi
+    echo "resolved $WAGGLE_BEEHIVE_UPLOAD_HOST to $hostip"
 
-while true; do
-    # update heartbeat file for liveness probe
-    touch /tmp/healthy
+    if ! cat /tmp/hosts > /etc/hosts; then
+        echo "failed to update /etc/hosts"
+        return 1
+    fi
+    
+    if ! echo "$hostip beehive-upload-server" >> /etc/hosts; then
+        echo "failed to update /etc/hosts"
+        return 1
+    fi
 
-    # check if there are any files to upload *before* connecting and
-    # authenticating with the server
-    numfiles=$(find /uploads -type f | grep -v .tmp | wc -l)
+    if ! echo "@cert-authority beehive-upload-server $(cat ${SSH_CA_PUBKEY})" > /root/.ssh/known_hosts; then
+        echo "failed to update /root/.ssh/known_hosts"
+        return 1
+    fi
+}
 
-    if [ $numfiles -gt 0 ]; then
-        echo "rsyncing $numfiles file(s)"
-        rsync -av \
+rsync_upload_files() {
+    rsync -av \
         --exclude '.tmp*' \
         --prune-empty-dirs \
         --remove-source-files \
@@ -90,9 +99,34 @@ while true; do
         --bwlimit=0 \
         "/uploads/" \
         "beehive-upload-server:~/uploads/"
-    else
+}
+
+upload_files() {
+    # check if there are any files to upload *before* connecting and
+    # authenticating with the server
+    numfiles=$(find /uploads -type f | grep -v .tmp | wc -l)
+    
+    if [ $numfiles -eq 0 ]; then
         echo "no files to rsync"
+        return 0
     fi
 
+    echo "resolving upload server address"
+    if ! resolve_upload_server_and_update_etc_hosts; then
+        echo "failed to resolve upload server and update /etc/hosts. retrying..."
+        return 1
+    fi
+
+    echo "rsyncing $numfiles file(s)"
+    if ! rsync_upload_files; then
+        echo "failed to rsync files"
+        return 1
+    fi
+}
+
+while true; do
+    if upload_files; then
+        touch /tmp/healthy
+    fi
     sleep 60
 done
