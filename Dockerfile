@@ -1,4 +1,4 @@
 FROM alpine:3.12
-RUN apk add --no-cache openssh-client rsync
+RUN apk add --no-cache openssh-client rsync bash
 COPY . .
-ENTRYPOINT ["/bin/sh", "main.sh"]
+ENTRYPOINT ["/main.sh"]
