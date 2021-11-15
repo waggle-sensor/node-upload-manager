@@ -101,12 +101,22 @@ rsync_upload_files() {
         "beehive-upload-server:~/uploads/"
 }
 
+attempt_cleanup_empty_dirs() {
+    # NOTE --ignore-fail-on-non-empty does *not* actually remove a non-empty dir - it simply
+    # suppressed the error message
+    # NOTE /uploads tree uses /uploads/task/version/ts-shasum structure and
+    # we only attempt to cleanup the ts-shasum dirs.
+    timeout 10 find /uploads -mindepth 3 -maxdepth 3 | xargs rmdir --ignore-fail-on-non-empty
+}
+
 upload_files() {
+    # NOTE this has a 10s timeout builtin, so we shouldn't never hang here
+    echo "attempting to cleanup empty dirs"
+    attempt_cleanup_empty_dirs
+
     # check if there are any files to upload *before* connecting and
     # authenticating with the server
-    numfiles=$(find /uploads -type f | grep -v .tmp | wc -l)
-    
-    if [ $numfiles -eq 0 ]; then
+    if ! find /uploads -name data | grep -v '\.tmp*' | grep -q -m1 .; then
         echo "no files to rsync"
         return 0
     fi
@@ -117,7 +127,7 @@ upload_files() {
         return 1
     fi
 
-    echo "rsyncing $numfiles file(s)"
+    echo "rsyncing file"
     if ! rsync_upload_files; then
         echo "failed to rsync files"
         return 1
