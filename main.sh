@@ -100,7 +100,7 @@ rsync_upload_files() {
 
     rsync -av \
         --exclude '.tmp*' \
-        --from-files="${upload_list}" \
+        --files-from="${upload_list}" \
         --remove-source-files \
         --partial-dir=.partial/ \
         --bwlimit=0 \
