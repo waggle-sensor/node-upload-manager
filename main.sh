@@ -91,14 +91,40 @@ resolve_upload_server_and_update_etc_hosts() {
 }
 
 rsync_upload_files() {
+    upload_list="$1"
+
+    if [ -z "${upload_list}" ]; then
+        echo "must provide upload list"
+        return 1
+    fi
+
     rsync -av \
         --exclude '.tmp*' \
-        --prune-empty-dirs \
+        --from-files="${upload_list}" \
         --remove-source-files \
         --partial-dir=.partial/ \
         --bwlimit=0 \
         "/uploads/" \
         "beehive-upload-server:~/uploads/"
+    # TODO investigate this option more. was using previously but
+    # not clear what it's doing. also don't want it to accidentally
+    # attempt to remove dir shared by plugin pod.
+    # --prune-empty-dirs
+}
+
+# NOTE since we sleep for 60s every batch, syncing 100K
+# cached data files would take 100K/100/60 = ~16.7 hours
+build_upload_list() {
+    # add up to 100 data files in one upload batch
+    (
+        cd /uploads
+    find . | awk '
+        /.tmp/ {next}
+        (n == 100) && !/data/ && !/meta/ {exit}
+        /data/ {n++}
+        {print}
+    '
+    )
 }
 
 attempt_cleanup_empty_dirs() {
@@ -114,10 +140,16 @@ upload_files() {
     echo "attempting to cleanup empty dirs"
     attempt_cleanup_empty_dirs
 
+    echo "building upload list"
+    if ! build_upload_list > /tmp/upload_list; then
+        echo "failed to build upload list"
+        return 1
+    fi
+
     # check if there are any files to upload *before* connecting and
     # authenticating with the server
-    if ! find /uploads -name data | grep -v '\.tmp*' | grep -q -m1 .; then
-        echo "no files to rsync"
+    if ! grep -q -m1 data /tmp/upload_list; then
+        echo "no data files to rsync"
         return 0
     fi
 
@@ -127,8 +159,8 @@ upload_files() {
         return 1
     fi
 
-    echo "rsyncing file"
-    if ! rsync_upload_files; then
+    echo "rsyncing files"
+    if ! rsync_upload_files /tmp/upload_list; then
         echo "failed to rsync files"
         return 1
     fi
