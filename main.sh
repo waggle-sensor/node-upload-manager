@@ -90,7 +90,7 @@ resolve_upload_server_and_update_etc_hosts() {
     fi
 }
 
-remove_empty_dirs_in_upload_list() {
+cleanup_dirs_in_upload_list() {
     upload_list="$1"
 
     if [ -z "${upload_list}" ]; then
@@ -149,13 +149,16 @@ upload_files() {
         fatal "failed to build upload batch list"
     fi
 
-    echo "doing pre rsync clean up"
-    remove_empty_dirs_in_upload_list /tmp/upload_list
-
     # check if there are any files to upload *before* connecting and
     # authenticating with the server
     if ! grep -q -m1 data /tmp/upload_list; then
         echo "no data files to rsync"
+
+        # NOTE we do this here to avoid removing files rsync will operate on
+        # TODO organize this better so empty dirs are cleanly separated from non-empty
+        echo "cleaning up empty dirs"
+        cleanup_dirs_in_upload_list /tmp/upload_list
+
         return 0
     fi
 
@@ -170,8 +173,8 @@ upload_files() {
         return 1
     fi
 
-    echo "doing post rsync clean up"
-    remove_empty_dirs_in_upload_list /tmp/upload_list
+    echo "cleaning up empty dirs"
+    cleanup_dirs_in_upload_list /tmp/upload_list
 }
 
 while true; do
