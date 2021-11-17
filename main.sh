@@ -112,39 +112,31 @@ rsync_upload_files() {
     # --prune-empty-dirs
 }
 
-# NOTE since we sleep for 60s every batch, syncing 100K
-# cached data files would take 100K/100/60 = ~16.7 hours
 build_upload_list() {
-    # add up to 100 data files in one upload batch
+    # group up to 100 data files or 1000 dirs in one upload batch
     (
         cd /uploads
-    find . | awk '
+    find . | awk -F/ '
+        # ignore tmp dirs
         /.tmp/ {next}
-        (n == 100) && !/data/ && !/meta/ {exit}
-        /data/ {n++}
+        # bail out if we reach 1000 dirs or 100 data items
+        (numdirs == 1000) || ((numdata == 100) && !/data/ && !/meta/) {exit}
+        # increment totals
+        NF == 4 {numdirs++}
+        /data/ {numdata++}
         {print}
     '
     )
 }
 
-attempt_cleanup_empty_dirs() {
-    # NOTE --ignore-fail-on-non-empty does *not* actually remove a non-empty dir - it simply
-    # suppressed the error message
-    # NOTE /uploads tree uses /uploads/task/version/ts-shasum structure and
-    # we only attempt to cleanup the ts-shasum dirs.
-    timeout 10 find /uploads -mindepth 3 -maxdepth 3 | xargs rmdir --ignore-fail-on-non-empty
-}
-
 upload_files() {
-    echo "attempting to cleanup empty dirs"
-    if ! attempt_cleanup_empty_dirs; then
-        echo "cleanup empty dirs failed - proceeding anyway"
-    fi
-
     echo "building upload batch list"
     if ! build_upload_list > /tmp/upload_list; then
         fatal "failed to build upload batch list"
     fi
+
+    echo "doing pre rsync clean up"
+    awk -F/ 'NF == 4' /tmp/upload_list | xargs -n 100 rmdir --ignore-fail-on-non-empty || true
 
     # check if there are any files to upload *before* connecting and
     # authenticating with the server
@@ -163,6 +155,9 @@ upload_files() {
         echo "failed to rsync files"
         return 1
     fi
+
+    echo "doing post rsync clean up"
+    awk -F/ 'NF == 4' /tmp/upload_list | xargs -n 100 rmdir --ignore-fail-on-non-empty || true
 }
 
 while true; do
