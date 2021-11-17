@@ -136,14 +136,14 @@ attempt_cleanup_empty_dirs() {
 }
 
 upload_files() {
-    # NOTE this has a 10s timeout builtin, so we shouldn't never hang here
     echo "attempting to cleanup empty dirs"
-    attempt_cleanup_empty_dirs
+    if ! attempt_cleanup_empty_dirs; then
+        echo "cleanup empty dirs failed - proceeding anyway"
+    fi
 
-    echo "building upload list"
+    echo "building upload batch list"
     if ! build_upload_list > /tmp/upload_list; then
-        echo "failed to build upload list"
-        return 1
+        fatal "failed to build upload batch list"
     fi
 
     # check if there are any files to upload *before* connecting and
@@ -155,8 +155,7 @@ upload_files() {
 
     echo "resolving upload server address"
     if ! resolve_upload_server_and_update_etc_hosts; then
-        echo "failed to resolve upload server and update /etc/hosts."
-        return 1
+        fatal "failed to resolve upload server and update /etc/hosts."
     fi
 
     echo "rsyncing files"
@@ -170,5 +169,5 @@ while true; do
     if upload_files; then
         touch /tmp/healthy
     fi
-    sleep 60
+    sleep 3
 done

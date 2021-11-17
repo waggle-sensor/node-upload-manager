@@ -1,7 +1,7 @@
 #!/bin/bash
 
 fatal() {
-    echo $*
+    echo 'fatal:' $*
     exit 1
 }
 
