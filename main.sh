@@ -90,7 +90,21 @@ resolve_upload_server_and_update_etc_hosts() {
     fi
 }
 
-rsync_upload_files() {
+remove_empty_dirs_in_upload_list() {
+    upload_list="$1"
+
+    if [ -z "${upload_list}" ]; then
+        echo "must provide upload list"
+        return 1
+    fi
+
+    (
+        cd /uploads
+        awk -F/ 'NF == 4' "${upload_list}" | xargs -n 100 rmdir --ignore-fail-on-non-empty || true
+    )
+}
+
+rsync_files_in_upload_list() {
     upload_list="$1"
 
     if [ -z "${upload_list}" ]; then
@@ -136,7 +150,7 @@ upload_files() {
     fi
 
     echo "doing pre rsync clean up"
-    awk -F/ 'NF == 4' /tmp/upload_list | xargs -n 100 rmdir --ignore-fail-on-non-empty || true
+    remove_empty_dirs_in_upload_list /tmp/upload_list
 
     # check if there are any files to upload *before* connecting and
     # authenticating with the server
@@ -151,13 +165,13 @@ upload_files() {
     fi
 
     echo "rsyncing files"
-    if ! rsync_upload_files /tmp/upload_list; then
+    if ! rsync_files_in_upload_list /tmp/upload_list; then
         echo "failed to rsync files"
         return 1
     fi
 
     echo "doing post rsync clean up"
-    awk -F/ 'NF == 4' /tmp/upload_list | xargs -n 100 rmdir --ignore-fail-on-non-empty || true
+    remove_empty_dirs_in_upload_list /tmp/upload_list
 }
 
 while true; do
