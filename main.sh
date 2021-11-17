@@ -101,7 +101,7 @@ remove_empty_dirs_in_upload_list() {
     (
         cd /uploads
         awk -F/ 'NF == 4' "${upload_list}" | xargs -n 100 rmdir --ignore-fail-on-non-empty || true
-    )
+    ) &> /dev/null
 }
 
 rsync_files_in_upload_list() {
