@@ -117,7 +117,8 @@ rsync_supervisor() {
         # check if io stats are stale
         if [ "$h1" = "$h2" ]; then
             echo "warning: rsync hasn't made progress in ${check_delay}s... sending interrupt!"
-            kill $(get_rsync_pids)
+            # attempt to kill. it's possible this is empty, so don't exit if this fails.
+            kill $(get_rsync_pids) &> /dev/null || true
         fi
 
         sleep "${check_internal}"
