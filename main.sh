@@ -90,6 +90,40 @@ resolve_upload_server_and_update_etc_hosts() {
     fi
 }
 
+get_rsync_pids() {
+    awk '/rsync/ {print $1}' /proc/[0-9]*/stat
+}
+
+get_rsync_io_stats() {
+    for pid in $(get_rsync_pids | sort); do
+        # add pid to differentiate multiple runs of rsync
+        echo "${pid}:"
+        cat "/proc/${pid}/io"
+    done
+}
+
+# rsync_supervisor is intended to be run as a background proc
+# and monitors io from rsync to make sure it's making progress
+rsync_supervisor() {
+    check_internal=10
+    check_delay=15
+
+    while true; do
+        # compute io stat diffs
+        h1=$(get_rsync_io_stats | sha1sum)
+        sleep "${check_delay}"
+        h2=$(get_rsync_io_stats | sha1sum)
+
+        # check if io stats are stale
+        if [ "$h1" = "$h2" ]; then
+            echo "warning: rsync hasn't made progress in ${check_delay}s... sending interrupt!"
+            kill $(get_rsync_pids)
+        fi
+
+        sleep "${check_internal}"
+    done
+}
+
 cleanup_dirs_in_upload_list() {
     upload_list="$1"
 
@@ -176,6 +210,8 @@ upload_files() {
     echo "cleaning up empty dirs"
     cleanup_dirs_in_upload_list /tmp/upload_list
 }
+
+rsync_supervisor &
 
 while true; do
     if upload_files; then
