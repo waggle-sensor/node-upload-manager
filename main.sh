@@ -212,6 +212,10 @@ upload_files() {
     cleanup_dirs_in_upload_list /tmp/upload_list
 }
 
+# TODO decide if we want to move this into something other than just a
+# background proc. some ideas:
+# * livenessprobe
+# * shared pid sidecar (wolfgang shared this with me: https://kubernetes.io/docs/tasks/configure-pod-container/share-process-namespace/)
 rsync_supervisor &
 
 while true; do
