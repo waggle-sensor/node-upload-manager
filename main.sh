@@ -97,9 +97,50 @@ resolve_upload_server_and_update_etc_hosts() {
     fi
 }
 
+get_rsync_pids() {
+    awk '/rsync/ {print $1}' /proc/[0-9]*/stat
+}
+
+get_rsync_io_stats() {
+    for pid in $(get_rsync_pids | sort); do
+        # add pid to differentiate multiple runs of rsync
+        echo "${pid}:"
+        cat "/proc/${pid}/io"
+    done
+}
+
+# rsync_supervisor is intended to be run as a background proc
+# and monitors io from rsync to make sure it's making progress
+rsync_supervisor() {
+    check_internal=10
+    check_delay=15
+
+    while true; do
+        # compute io stat diffs
+        h1=$(get_rsync_io_stats | sha1sum)
+        sleep "${check_delay}"
+        h2=$(get_rsync_io_stats | sha1sum)
+
+        # check if io stats are stale
+        if [ "$h1" = "$h2" ]; then
+            echo "warning: rsync hasn't made progress in ${check_delay}s... sending interrupt!"
+            # attempt to kill. it's possible this is empty, so don't exit if this fails.
+            kill $(get_rsync_pids) &> /dev/null || true
+        fi
+
+        sleep "${check_internal}"
+    done
+}
+
 attempt_to_cleanup_dir() {
     rmdir "${1}" || true &> /dev/null
 }
+
+# TODO decide if we want to move this into something other than just a
+# background proc. some ideas:
+# * livenessprobe
+# * shared pid sidecar (wolfgang shared this with me: https://kubernetes.io/docs/tasks/configure-pod-container/share-process-namespace/)
+rsync_supervisor &
 
 while true; do
     if ! resolve_upload_server_and_update_etc_hosts; then
