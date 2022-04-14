@@ -121,6 +121,8 @@ while true; do
         echo "uploading: ${dir}"
         rsync -av \
             --exclude '.tmp*' \
+            --progress \
+            --compress \
             --remove-source-files \
             --partial-dir=.partial/ \
             --bwlimit=0 \
