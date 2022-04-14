@@ -153,9 +153,9 @@ while true; do
     # path:  /uploads/test-pipeline/0.2.8/1649746359093671949-a31446e4291ac3a04a3c331e674252a63ee95604/data
     # depth:    0         1           2                      3                                           4
     find . -mindepth 3 -maxdepth 3 | while read -r dir; do
-        if basename "${dir}" | grep '^.tmp'; do
+        if basename "${dir}" | grep '^.tmp'; then
             continue
-        done
+        fi
 
         if ! ls "${dir}" | grep -q .; then
             echo "skipping dir with no uploads: ${dir}"
@@ -180,6 +180,9 @@ while true; do
         # indicate that we are healthy and making progress after each transfer completes
         touch /tmp/healthy
     done
+
+    # indicate that we are healthy and making progress, even if no files needed to be uploaded
+    touch /tmp/healthy
 
     sleep 10
 done
