@@ -153,6 +153,10 @@ while true; do
     # path:  /uploads/test-pipeline/0.2.8/1649746359093671949-a31446e4291ac3a04a3c331e674252a63ee95604/data
     # depth:    0         1           2                      3                                           4
     find . -mindepth 3 -maxdepth 3 | while read -r dir; do
+        if basename "${dir}" | grep '^.tmp'; do
+            continue
+        done
+
         if ! ls "${dir}" | grep -q .; then
             echo "skipping dir with no uploads: ${dir}"
             attempt_to_cleanup_dir "${dir}"
