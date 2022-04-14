@@ -147,6 +147,7 @@ while true; do
         fatal "failed to resolve upload server and update /etc/hosts."
     fi
 
+    echo "scanning and uploading files..."
     cd /uploads
 
     # NOTE(sean) upload data is mounted at /uploads with leaf files like:
@@ -184,5 +185,6 @@ while true; do
     # indicate that we are healthy and making progress, even if no files needed to be uploaded
     touch /tmp/healthy
 
+    echo "uploaded all files found"
     sleep 10
 done
