@@ -124,8 +124,8 @@ while true; do
             --remove-source-files \
             --partial-dir=.partial/ \
             --bwlimit=0 \
-            "${dir}" \
-            "beehive-upload-server:~/uploads/"
+            "${dir}/" \
+            "beehive-upload-server:~/uploads/${dir}/"
         attempt_to_cleanup_dir "${dir}"
         echo "done: ${dir}"
 
