@@ -165,6 +165,8 @@ while true; do
         fi
 
         echo "uploading: ${dir}"
+        # ensure upload file parent dirs exists
+        ssh beehive-upload-server "mkdir -p ~/uploads/${dir}/"
         rsync -av \
             --exclude '.tmp*' \
             --progress \
