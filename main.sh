@@ -151,7 +151,10 @@ rsync_files_in_upload_list() {
         --exclude '.tmp*' \
         --files-from="${upload_list}" \
         --remove-source-files \
+        --partial \
         --partial-dir=.partial/ \
+        --progress \
+        --compress \
         --bwlimit=0 \
         "/uploads/" \
         "beehive-upload-server:~/uploads/"
