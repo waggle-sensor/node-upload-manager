@@ -1,4 +1,5 @@
-#!/bin/bash -e
+#!/bin/bash
+set -eu
 
 . common.sh
 
@@ -46,6 +47,9 @@ echo "ssh cert: ${SSH_CERT}"
 username=$(ssh-keygen -L -f "${SSH_CERT}" | awk '$1 ~ /^node-/ {print $1}')
 echo "using username ${username}"
 
+# ensure ssh dirs exist
+mkdir -p /root/.ssh/controlmasters
+
 # define ssh config
 cat <<EOF > /root/.ssh/config
 Host beehive-upload-server
@@ -56,6 +60,9 @@ Host beehive-upload-server
     BatchMode yes
     ConnectTimeout 30
     LogLevel VERBOSE
+    ControlPath /root/.ssh/controlmasters/%h:%p:%r
+    ControlMaster auto
+    ControlPersist 1m
 EOF
 
 # NOTE workaround for "Host key verification failed" issue. at the moment, this seems to be because
@@ -90,137 +97,41 @@ resolve_upload_server_and_update_etc_hosts() {
     fi
 }
 
-get_rsync_pids() {
-    awk '/rsync/ {print $1}' /proc/[0-9]*/stat
+attempt_to_cleanup_dir() {
+    rmdir "${1}" || true &> /dev/null
 }
 
-get_rsync_io_stats() {
-    for pid in $(get_rsync_pids | sort); do
-        # add pid to differentiate multiple runs of rsync
-        echo "${pid}:"
-        cat "/proc/${pid}/io"
-    done
-}
-
-# rsync_supervisor is intended to be run as a background proc
-# and monitors io from rsync to make sure it's making progress
-rsync_supervisor() {
-    check_internal=10
-    check_delay=15
-
-    while true; do
-        # compute io stat diffs
-        h1=$(get_rsync_io_stats | sha1sum)
-        sleep "${check_delay}"
-        h2=$(get_rsync_io_stats | sha1sum)
-
-        # check if io stats are stale
-        if [ "$h1" = "$h2" ]; then
-            echo "warning: rsync hasn't made progress in ${check_delay}s... sending interrupt!"
-            # attempt to kill. it's possible this is empty, so don't exit if this fails.
-            kill $(get_rsync_pids) &> /dev/null || true
-        fi
-
-        sleep "${check_internal}"
-    done
-}
-
-cleanup_dirs_in_upload_list() {
-    upload_list="$1"
-
-    if [ -z "${upload_list}" ]; then
-        echo "must provide upload list"
-        return 1
-    fi
-
-    (
-        cd /uploads
-        awk -F/ 'NF == 4' "${upload_list}" | xargs -n 100 rmdir --ignore-fail-on-non-empty || true
-    ) &> /dev/null
-}
-
-rsync_files_in_upload_list() {
-    upload_list="$1"
-
-    if [ -z "${upload_list}" ]; then
-        echo "must provide upload list"
-        return 1
-    fi
-
-    rsync -av \
-        --exclude '.tmp*' \
-        --files-from="${upload_list}" \
-        --remove-source-files \
-        --partial-dir=.partial/ \
-        --bwlimit=0 \
-        "/uploads/" \
-        "beehive-upload-server:~/uploads/"
-    # TODO investigate this option more. was using previously but
-    # not clear what it's doing. also don't want it to accidentally
-    # attempt to remove dir shared by plugin pod.
-    # --prune-empty-dirs
-}
-
-build_upload_list() {
-    # group up to 100 data files or 1000 dirs in one upload batch
-    (
-        cd /uploads
-    find . | awk -F/ '
-        # ignore tmp dirs
-        /.tmp/ {next}
-        # bail out if we reach 1000 dirs or 100 data items
-        (numdirs == 1000) || ((numdata == 100) && !/data/ && !/meta/) {exit}
-        # increment totals
-        NF == 4 {numdirs++}
-        /data/ {numdata++}
-        {print}
-    '
-    )
-}
-
-upload_files() {
-    echo "building upload batch list"
-    if ! build_upload_list > /tmp/upload_list; then
-        fatal "failed to build upload batch list"
-    fi
-
-    # check if there are any files to upload *before* connecting and
-    # authenticating with the server
-    if ! grep -q -m1 data /tmp/upload_list; then
-        echo "no data files to rsync"
-
-        # NOTE we do this here to avoid removing files rsync will operate on
-        # TODO organize this better so empty dirs are cleanly separated from non-empty
-        echo "cleaning up empty dirs"
-        cleanup_dirs_in_upload_list /tmp/upload_list
-
-        return 0
-    fi
-
-    echo "resolving upload server address"
+while true; do
     if ! resolve_upload_server_and_update_etc_hosts; then
         fatal "failed to resolve upload server and update /etc/hosts."
     fi
 
-    echo "rsyncing files"
-    if ! rsync_files_in_upload_list /tmp/upload_list; then
-        echo "failed to rsync files"
-        return 1
-    fi
+    cd /uploads
 
-    echo "cleaning up empty dirs"
-    cleanup_dirs_in_upload_list /tmp/upload_list
-}
+    # NOTE(sean) upload data is mounted at /uploads with leaf files like:
+    # path:  /uploads/test-pipeline/0.2.8/1649746359093671949-a31446e4291ac3a04a3c331e674252a63ee95604/data
+    # depth:    0         1           2                      3                                           4
+    find . -mindepth 3 -maxdepth 3 | while read -r dir; do
+        if ! ls "${dir}" | grep -q .; then
+            echo "skipping dir with no uploads: ${dir}"
+            attempt_to_cleanup_dir "${dir}"
+            continue
+        fi
 
-# TODO decide if we want to move this into something other than just a
-# background proc. some ideas:
-# * livenessprobe
-# * shared pid sidecar (wolfgang shared this with me: https://kubernetes.io/docs/tasks/configure-pod-container/share-process-namespace/)
-rsync_supervisor &
+        echo "uploading: ${dir}"
+        rsync -av \
+            --exclude '.tmp*' \
+            --remove-source-files \
+            --partial-dir=.partial/ \
+            --bwlimit=0 \
+            "${dir}" \
+            "beehive-upload-server:~/uploads/"
+        attempt_to_cleanup_dir "${dir}"
+        echo "done: ${dir}"
 
-while true; do
-    if upload_files; then
+        # indicate that we are healthy and making progress after each transfer completes
         touch /tmp/healthy
-    fi
-    sleep 3
+    done
+
+    sleep 10
 done
