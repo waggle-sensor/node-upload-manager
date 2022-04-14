@@ -1,4 +1,5 @@
-#!/bin/bash -e
+#!/bin/bash
+set -eu
 
 . common.sh
 
@@ -46,6 +47,9 @@ echo "ssh cert: ${SSH_CERT}"
 username=$(ssh-keygen -L -f "${SSH_CERT}" | awk '$1 ~ /^node-/ {print $1}')
 echo "using username ${username}"
 
+# ensure ssh dirs exist
+mkdir -p /root/.ssh/controlmasters
+
 # define ssh config
 cat <<EOF > /root/.ssh/config
 Host beehive-upload-server
@@ -56,6 +60,9 @@ Host beehive-upload-server
     BatchMode yes
     ConnectTimeout 30
     LogLevel VERBOSE
+    ControlPath /root/.ssh/controlmasters/%h:%p:%r
+    ControlMaster auto
+    ControlPersist 1m
 EOF
 
 # NOTE workaround for "Host key verification failed" issue. at the moment, this seems to be because
@@ -125,91 +132,8 @@ rsync_supervisor() {
     done
 }
 
-cleanup_dirs_in_upload_list() {
-    upload_list="$1"
-
-    if [ -z "${upload_list}" ]; then
-        echo "must provide upload list"
-        return 1
-    fi
-
-    (
-        cd /uploads
-        awk -F/ 'NF == 4' "${upload_list}" | xargs -n 100 rmdir --ignore-fail-on-non-empty || true
-    ) &> /dev/null
-}
-
-rsync_files_in_upload_list() {
-    upload_list="$1"
-
-    if [ -z "${upload_list}" ]; then
-        echo "must provide upload list"
-        return 1
-    fi
-
-    rsync -av \
-        --exclude '.tmp*' \
-        --files-from="${upload_list}" \
-        --remove-source-files \
-        --partial-dir=.partial/ \
-        --bwlimit=0 \
-        "/uploads/" \
-        "beehive-upload-server:~/uploads/"
-    # TODO investigate this option more. was using previously but
-    # not clear what it's doing. also don't want it to accidentally
-    # attempt to remove dir shared by plugin pod.
-    # --prune-empty-dirs
-}
-
-build_upload_list() {
-    # group up to 100 data files or 1000 dirs in one upload batch
-    (
-        cd /uploads
-    find . | awk -F/ '
-        # ignore tmp dirs
-        /.tmp/ {next}
-        # bail out if we reach 1000 dirs or 100 data items
-        (numdirs == 1000) || ((numdata == 100) && !/data/ && !/meta/) {exit}
-        # increment totals
-        NF == 4 {numdirs++}
-        /data/ {numdata++}
-        {print}
-    '
-    )
-}
-
-upload_files() {
-    echo "building upload batch list"
-    if ! build_upload_list > /tmp/upload_list; then
-        fatal "failed to build upload batch list"
-    fi
-
-    # check if there are any files to upload *before* connecting and
-    # authenticating with the server
-    if ! grep -q -m1 data /tmp/upload_list; then
-        echo "no data files to rsync"
-
-        # NOTE we do this here to avoid removing files rsync will operate on
-        # TODO organize this better so empty dirs are cleanly separated from non-empty
-        echo "cleaning up empty dirs"
-        cleanup_dirs_in_upload_list /tmp/upload_list
-
-        return 0
-    fi
-
-    echo "resolving upload server address"
-    if ! resolve_upload_server_and_update_etc_hosts; then
-        fatal "failed to resolve upload server and update /etc/hosts."
-    fi
-
-    echo "rsyncing files"
-    if ! rsync_files_in_upload_list /tmp/upload_list; then
-        echo "failed to rsync files"
-        return 1
-    fi
-
-    echo "cleaning up empty dirs"
-    cleanup_dirs_in_upload_list /tmp/upload_list
+attempt_to_cleanup_dir() {
+    rmdir "${1}" || true &> /dev/null
 }
 
 # TODO decide if we want to move this into something other than just a
@@ -219,8 +143,48 @@ upload_files() {
 rsync_supervisor &
 
 while true; do
-    if upload_files; then
-        touch /tmp/healthy
+    if ! resolve_upload_server_and_update_etc_hosts; then
+        fatal "failed to resolve upload server and update /etc/hosts."
     fi
-    sleep 3
+
+    echo "scanning and uploading files..."
+    cd /uploads
+
+    # NOTE(sean) upload data is mounted at /uploads with leaf files like:
+    # path:  /uploads/test-pipeline/0.2.8/1649746359093671949-a31446e4291ac3a04a3c331e674252a63ee95604/data
+    # depth:    0         1           2                      3                                           4
+    find . -mindepth 3 -maxdepth 3 | while read -r dir; do
+        if basename "${dir}" | grep '^.tmp'; then
+            continue
+        fi
+
+        if ! ls "${dir}" | grep -q .; then
+            echo "skipping dir with no uploads: ${dir}"
+            attempt_to_cleanup_dir "${dir}"
+            continue
+        fi
+
+        echo "uploading: ${dir}"
+        rsync -av \
+            --exclude '.tmp*' \
+            --progress \
+            --compress \
+            --remove-source-files \
+            --itemize-changes \
+            --partial-dir=.partial/ \
+            --bwlimit=0 \
+            "${dir}/" \
+            "beehive-upload-server:~/uploads/${dir}/"
+        attempt_to_cleanup_dir "${dir}"
+        echo "done: ${dir}"
+
+        # indicate that we are healthy and making progress after each transfer completes
+        touch /tmp/healthy
+    done
+
+    # indicate that we are healthy and making progress, even if no files needed to be uploaded
+    touch /tmp/healthy
+
+    echo "uploaded all files found"
+    sleep 10
 done

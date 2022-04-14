@@ -3,7 +3,7 @@
 . common.sh
 
 if ! resolve_host_ip 1.1.1.1 | grep 1.1.1.1; then
-    fatal "should have resolved hoost ip 1.1.1.1"
+    fatal "should have resolved host ip 1.1.1.1"
 fi
 
 if ! resolve_host_ip google.com; then
