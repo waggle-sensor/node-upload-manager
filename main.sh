@@ -124,6 +124,7 @@ while true; do
             --progress \
             --compress \
             --remove-source-files \
+            --itemize-changes \
             --partial-dir=.partial/ \
             --bwlimit=0 \
             "${dir}/" \
