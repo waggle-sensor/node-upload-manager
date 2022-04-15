@@ -142,6 +142,12 @@ attempt_to_cleanup_dir() {
 # * shared pid sidecar (wolfgang shared this with me: https://kubernetes.io/docs/tasks/configure-pod-container/share-process-namespace/)
 rsync_supervisor &
 
+filter_valid_paths() {
+    # example:
+    # /uploads/test-pipeline/0.2.8/1649746359093671949-a31446e4291ac3a04a3c331e674252a63ee95604/data
+    awk -F/ '$4 ~ /[0-9]+-[0-9a-f]+/'
+}
+
 while true; do
     if ! resolve_upload_server_and_update_etc_hosts; then
         fatal "failed to resolve upload server and update /etc/hosts."
@@ -153,11 +159,7 @@ while true; do
     # NOTE(sean) upload data is mounted at /uploads with leaf files like:
     # path:  /uploads/test-pipeline/0.2.8/1649746359093671949-a31446e4291ac3a04a3c331e674252a63ee95604/data
     # depth:    0         1           2                      3                                           4
-    find . -mindepth 3 -maxdepth 3 -type d | while read -r dir; do
-        if basename "${dir}" | grep '^.tmp'; then
-            continue
-        fi
-
+    find . -mindepth 3 -maxdepth 3 -type d | filter_valid_paths | while read -r dir; do
         if ! ls "${dir}" | grep -q .; then
             echo "skipping dir with no uploads: ${dir}"
             attempt_to_cleanup_dir "${dir}"
