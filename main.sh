@@ -98,13 +98,13 @@ resolve_upload_server_and_update_etc_hosts() {
 }
 
 get_rsync_pids() {
-    awk '/rsync/ {print $1}' /proc/[0-9]*/stat
+    awk '/rsync/ {print $1}' /proc/[0-9]*/stat 2>/dev/null || true
 }
 
 get_rsync_io_stats() {
     for pid in $(get_rsync_pids | sort); do
         # add pid to differentiate multiple runs of rsync
-        echo "${pid}:"
+        echo "pid: ${pid}"
         cat "/proc/${pid}/io"
     done
 }
