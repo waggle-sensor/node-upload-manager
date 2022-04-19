@@ -115,20 +115,24 @@ rsync_supervisor() {
     check_interval=10
     check_delay=15
 
-    while true; do
-        # compute io stat diffs
+    while sleep "${check_interval}"; do
+        # if rsync healthy flag exists, then we're making progress.
+        if rm /tmp/rsync_healthy; then
+            continue
+        fi
+
+        # otherwise, fall back to comparing io stats.
         h1=$(get_rsync_io_stats | sha1sum)
         sleep "${check_delay}"
         h2=$(get_rsync_io_stats | sha1sum)
 
-        # check if io stats are stale
-        if [ "${h1}" = "${h2}" ]; then
-            echo "warning: rsync hasn't made progress in ${check_delay}s... sending interrupt!"
-            # attempt to kill. it's possible this is empty, so don't exit if this fails.
-            kill $(get_rsync_pids) &> /dev/null || true
+        # if hashes differ, we're making progress.
+        if [ "${h1}" != "${h2}" ]; then
+            continue
         fi
 
-        sleep "${check_interval}"
+        echo "warning: rsync hasn't made progress in ${check_delay}s... sending interrupt!"
+        kill $(get_rsync_pids) &> /dev/null || true
     done
 }
 
@@ -179,6 +183,8 @@ while true; do
             --bwlimit=0 \
             "${dir}/" \
             "beehive-upload-server:~/uploads/${dir}/"
+        touch /tmp/rsync_healthy
+
         attempt_to_cleanup_dir "${dir}"
         echo "done: ${dir}"
 
