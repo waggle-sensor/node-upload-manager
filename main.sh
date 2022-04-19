@@ -112,7 +112,7 @@ get_rsync_io_stats() {
 # rsync_supervisor is intended to be run as a background proc
 # and monitors io from rsync to make sure it's making progress
 rsync_supervisor() {
-    check_interval=10
+    check_interval=30
     check_delay=15
 
     while sleep "${check_interval}"; do
@@ -195,7 +195,7 @@ while true; do
     done
 
     # indicate that we are healthy and making progress, even if no files needed to be uploaded
-    touch /tmp/healthy
+    touch /tmp/rsync_healthy /tmp/healthy
 
     echo "uploaded all files found"
     sleep 10
