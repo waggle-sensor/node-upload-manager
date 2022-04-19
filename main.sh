@@ -116,12 +116,14 @@ rsync_supervisor() {
     check_delay=15
 
     while sleep "${check_interval}"; do
-        # if rsync healthy flag exists, then we're making progress.
+        # if rsync healthy flag exists, then we're making progress. short lived but successful
+        # rsyncs will be covered by this case.
         if rm /tmp/rsync_healthy; then
             continue
         fi
 
-        # otherwise, fall back to comparing io stats.
+        # otherwise, fall back to comparing io stats. long lived transfers which take a long time
+        # but are making progress will be covered by this case.
         h1=$(get_rsync_io_stats | sha1sum)
         sleep "${check_delay}"
         h2=$(get_rsync_io_stats | sha1sum)
