@@ -122,7 +122,7 @@ rsync_supervisor() {
         h2=$(get_rsync_io_stats | sha1sum)
 
         # check if io stats are stale
-        if [ "$h1" = "$h2" ]; then
+        if [ "${h1}" = "${h2}" ]; then
             echo "warning: rsync hasn't made progress in ${check_delay}s... sending interrupt!"
             # attempt to kill. it's possible this is empty, so don't exit if this fails.
             kill $(get_rsync_pids) &> /dev/null || true
