@@ -105,14 +105,14 @@ get_rsync_io_stats() {
     for pid in $(get_rsync_pids | sort); do
         # add pid to differentiate multiple runs of rsync
         echo "pid: ${pid}"
-        cat "/proc/${pid}/io"
+        cat "/proc/${pid}/io" 2>/dev/null || true
     done
 }
 
 # rsync_supervisor is intended to be run as a background proc
 # and monitors io from rsync to make sure it's making progress
 rsync_supervisor() {
-    check_internal=10
+    check_interval=10
     check_delay=15
 
     while true; do
@@ -128,7 +128,7 @@ rsync_supervisor() {
             kill $(get_rsync_pids) &> /dev/null || true
         fi
 
-        sleep "${check_internal}"
+        sleep "${check_interval}"
     done
 }
 
