@@ -148,10 +148,24 @@ attempt_to_cleanup_dir() {
 # * shared pid sidecar (wolfgang shared this with me: https://kubernetes.io/docs/tasks/configure-pod-container/share-process-namespace/)
 rsync_supervisor &
 
-filter_valid_paths() {
-    # example:
-    # /uploads/test-pipeline/0.2.8/1649746359093671949-a31446e4291ac3a04a3c331e674252a63ee95604/data
-    awk -F/ '$4 ~ /[0-9]+-[0-9a-f]+/'
+find_uploads_in_cwd() {
+    find . -mindepth 3 -maxdepth 3 -type d
+}
+
+find_uploads_in_cwd() {
+    # NOTE(sean) upload data is mounted at /uploads with leaf files like:
+    #
+    # without job (default: sage)
+    # path:  ./test-pipeline/0.2.8/1649746359093671949-a31446e4291ac3a04a3c331e674252a63ee95604/data
+    # depth: 1     2           3                      4                                         files
+    #
+    # with job
+    # path:  ./Pluginctl/test-pipeline/0.2.8/1649746359093671949-a31446e4291ac3a04a3c331e674252a63ee95604/data
+    # depth: 1     2         3           4                      5                                         files
+    find . -mindepth 3 -maxdepth 4 -type d | awk -F/ '
+$3 ~ /[0-9]+\.[0-9]+\.[0-9]+/ && $4 ~ /[0-9]+-[0-9a-f]+/
+$4 ~ /[0-9]+\.[0-9]+\.[0-9]+/ && $5 ~ /[0-9]+-[0-9a-f]+/
+'
 }
 
 while true; do
@@ -162,10 +176,7 @@ while true; do
     echo "scanning and uploading files..."
     cd /uploads
 
-    # NOTE(sean) upload data is mounted at /uploads with leaf files like:
-    # path:  /uploads/test-pipeline/0.2.8/1649746359093671949-a31446e4291ac3a04a3c331e674252a63ee95604/data
-    # depth:    0         1           2                      3                                           4
-    find . -mindepth 3 -maxdepth 3 -type d | filter_valid_paths | while read -r dir; do
+    find_uploads_in_cwd | while read -r dir; do
         if ! ls "${dir}" | grep -q .; then
             echo "skipping dir with no uploads: ${dir}"
             attempt_to_cleanup_dir "${dir}"
