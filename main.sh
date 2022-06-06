@@ -91,7 +91,7 @@ resolve_upload_server_and_update_etc_hosts() {
         return 1
     fi
 
-    if ! echo "@cert-authority beehive-upload-server $(cat ${SSH_CA_PUBKEY})" > /root/.ssh/known_hosts; then
+    if ! echo "@cert-authority beehive-upload-server $(cat "${SSH_CA_PUBKEY}")" > /root/.ssh/known_hosts; then
         echo "failed to update /root/.ssh/known_hosts"
         return 1
     fi
@@ -168,6 +168,44 @@ $4 ~ /[0-9]+\.[0-9]+\.[0-9]+/ && $5 ~ /[0-9]+-[0-9a-f]+/
 '
 }
 
+upload_dir() {
+    dir="${1}"
+
+    while true; do
+        # ensure upload file parent dirs exists
+        ssh beehive-upload-server "mkdir -p ~/uploads/${dir}/"
+
+        # rsync upload files in dir
+        rsync -av \
+            --exclude '.tmp*' \
+            --progress \
+            --compress \
+            --remove-source-files \
+            --itemize-changes \
+            --partial-dir=.partial/ \
+            --bwlimit=0 \
+            "${dir}/" \
+            "beehive-upload-server:~/uploads/${dir}/" || err="$?"
+
+        case "${err}" in
+        20)
+            # handle case where rsync supervisor kills program.
+            # (rsync exits with 20 on sigint or sigterm.)
+            echo "rsync was interrupted by supervisor - will retry."
+            sleep 1
+            continue
+            ;;
+        0)
+            return
+            ;;
+        *)
+            echo "rsync failed with unexpected error code: ${err}"
+            return 1
+            ;;
+        esac
+    done
+}
+
 while true; do
     if ! resolve_upload_server_and_update_etc_hosts; then
         fatal "failed to resolve upload server and update /etc/hosts."
@@ -184,25 +222,16 @@ while true; do
         fi
 
         echo "uploading: ${dir}"
-        # ensure upload file parent dirs exists
-        ssh beehive-upload-server "mkdir -p ~/uploads/${dir}/"
-        rsync -av \
-            --exclude '.tmp*' \
-            --progress \
-            --compress \
-            --remove-source-files \
-            --itemize-changes \
-            --partial-dir=.partial/ \
-            --bwlimit=0 \
-            "${dir}/" \
-            "beehive-upload-server:~/uploads/${dir}/"
+        upload_dir "${dir}"
         touch /tmp/rsync_healthy
 
+        echo "cleaning up: ${dir}"
         attempt_to_cleanup_dir "${dir}"
-        echo "done: ${dir}"
 
         # indicate that we are healthy and making progress after each transfer completes
         touch /tmp/healthy
+
+        echo "done: ${dir}"
     done
 
     # indicate that we are healthy and making progress, even if no files needed to be uploaded
