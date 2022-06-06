@@ -176,7 +176,7 @@ upload_dir() {
         ssh beehive-upload-server "mkdir -p ~/uploads/${dir}/"
 
         # rsync upload files in dir
-        rsync -av \
+        if rsync -av \
             --exclude '.tmp*' \
             --progress \
             --compress \
@@ -185,24 +185,24 @@ upload_dir() {
             --partial-dir=.partial/ \
             --bwlimit=0 \
             "${dir}/" \
-            "beehive-upload-server:~/uploads/${dir}/" || err="$?"
-
-        case "${err}" in
-        20)
-            # handle case where rsync supervisor kills program.
-            # (rsync exits with 20 on sigint or sigterm.)
-            echo "rsync was interrupted by supervisor - will retry."
-            sleep 1
-            continue
-            ;;
-        0)
+            "beehive-upload-server:~/uploads/${dir}/"; then
             return
-            ;;
-        *)
-            echo "rsync failed with unexpected error code: ${err}"
-            return 1
-            ;;
-        esac
+        else
+            err="$?"
+            case "${err}" in
+            20)
+                # handle case where rsync supervisor kills program.
+                # (rsync exits with 20 on sigint or sigterm.)
+                echo "rsync was interrupted by supervisor - will retry."
+                sleep 1
+                continue
+                ;;
+            *)
+                echo "rsync failed with unexpected error code: ${err}"
+                return 1
+                ;;
+            esac
+        fi
     done
 }
 
