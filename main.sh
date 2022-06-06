@@ -163,8 +163,13 @@ find_uploads_in_cwd() {
     # path:  ./Pluginctl/test-pipeline/0.2.8/1649746359093671949-a31446e4291ac3a04a3c331e674252a63ee95604/data
     # depth: 1     2         3           4                      5                                         files
     find . -mindepth 3 -maxdepth 4 -type d | awk -F/ '
+# match paths which ends in version/timestamp-shasum
 $3 ~ /[0-9]+\.[0-9]+\.[0-9]+/ && $4 ~ /[0-9]+-[0-9a-f]+/
 $4 ~ /[0-9]+\.[0-9]+\.[0-9]+/ && $5 ~ /[0-9]+-[0-9a-f]+/
+
+# match paths which ends in latest/timestamp-shasum
+$3 == "latest" && $4 ~ /[0-9]+-[0-9a-f]+/
+$4 == "latest" && $5 ~ /[0-9]+-[0-9a-f]+/
 '
 }
 
