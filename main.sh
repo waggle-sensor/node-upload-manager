@@ -219,7 +219,7 @@ while true; do
     cd /uploads
 
     echo "cleaning up empty upload dirs..."
-    find . -type d -empty -delete
+    find . -mindepth 1 -type d -empty -delete
 
     echo "scanning and uploading files..."
     find_uploads_in_cwd | while read -r dir; do
