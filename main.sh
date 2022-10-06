@@ -149,10 +149,6 @@ attempt_to_cleanup_dir() {
 rsync_supervisor &
 
 find_uploads_in_cwd() {
-    find . -mindepth 3 -maxdepth 3 -type d
-}
-
-find_uploads_in_cwd() {
     # NOTE(sean) upload data is mounted at /uploads with leaf files like:
     #
     # without job (default: sage)
