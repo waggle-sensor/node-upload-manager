@@ -149,10 +149,6 @@ attempt_to_cleanup_dir() {
 rsync_supervisor &
 
 find_uploads_in_cwd() {
-    find . -mindepth 3 -maxdepth 3 -type d
-}
-
-find_uploads_in_cwd() {
     # NOTE(sean) upload data is mounted at /uploads with leaf files like:
     #
     # without job (default: sage)
@@ -162,7 +158,7 @@ find_uploads_in_cwd() {
     # with job
     # path:  ./Pluginctl/test-pipeline/0.2.8/1649746359093671949-a31446e4291ac3a04a3c331e674252a63ee95604/data
     # depth: 1     2         3           4                      5                                         files
-    find . -mindepth 3 -maxdepth 4 -type d | awk -F/ '
+    find . -mindepth 3 -maxdepth 4 -type d ! -empty | awk -F/ '
 # match paths which ends in version/timestamp-shasum
 $3 ~ /[0-9]+\.[0-9]+\.[0-9]+/ && $4 ~ /[0-9]+-[0-9a-f]+/
 $4 ~ /[0-9]+\.[0-9]+\.[0-9]+/ && $5 ~ /[0-9]+-[0-9a-f]+/
@@ -216,26 +212,17 @@ while true; do
         fatal "failed to resolve upload server and update /etc/hosts."
     fi
 
-    echo "scanning and uploading files..."
     cd /uploads
 
-    find_uploads_in_cwd | while read -r dir; do
-        if ! ls "${dir}" | grep -q .; then
-            echo "skipping dir with no uploads: ${dir}"
-            attempt_to_cleanup_dir "${dir}"
-            continue
-        fi
+    echo "cleaning up empty upload dirs..."
+    find . -mindepth 1 -type d -empty -delete
 
+    echo "scanning and uploading files..."
+    find_uploads_in_cwd | while read -r dir; do
         echo "uploading: ${dir}"
         upload_dir "${dir}"
-        touch /tmp/rsync_healthy
-
-        echo "cleaning up: ${dir}"
-        attempt_to_cleanup_dir "${dir}"
-
         # indicate that we are healthy and making progress after each transfer completes
-        touch /tmp/healthy
-
+        touch /tmp/rsync_healthy /tmp/healthy
         echo "done: ${dir}"
     done
 
