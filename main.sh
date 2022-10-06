@@ -225,16 +225,12 @@ while true; do
     find_uploads_in_cwd | while read -r dir; do
         if ! ls "${dir}" | grep -q .; then
             echo "skipping dir with no uploads: ${dir}"
-            attempt_to_cleanup_dir "${dir}"
             continue
         fi
 
         echo "uploading: ${dir}"
         upload_dir "${dir}"
         touch /tmp/rsync_healthy
-
-        echo "cleaning up: ${dir}"
-        attempt_to_cleanup_dir "${dir}"
 
         # indicate that we are healthy and making progress after each transfer completes
         touch /tmp/healthy
