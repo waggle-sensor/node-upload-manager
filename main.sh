@@ -221,11 +221,8 @@ while true; do
     find_uploads_in_cwd | while read -r dir; do
         echo "uploading: ${dir}"
         upload_dir "${dir}"
-        touch /tmp/rsync_healthy
-
         # indicate that we are healthy and making progress after each transfer completes
-        touch /tmp/healthy
-
+        touch /tmp/rsync_healthy /tmp/healthy
         echo "done: ${dir}"
     done
 
