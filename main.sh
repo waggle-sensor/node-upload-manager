@@ -216,9 +216,12 @@ while true; do
         fatal "failed to resolve upload server and update /etc/hosts."
     fi
 
-    echo "scanning and uploading files..."
     cd /uploads
 
+    echo "cleaning up empty upload dirs..."
+    find . -type d -empty -delete
+
+    echo "scanning and uploading files..."
     find_uploads_in_cwd | while read -r dir; do
         if ! ls "${dir}" | grep -q .; then
             echo "skipping dir with no uploads: ${dir}"
