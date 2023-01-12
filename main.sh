@@ -223,10 +223,10 @@ while true; do
     # deployments. While we don't fully understand the issue yet, this will retry to address the possibility
     # of a race condition. If it's a system level issue that requires a restart, the liveness probe will
     # eventually take care of that.
-    while ! resolve_upload_server_and_update_etc_hosts; then
+    while ! resolve_upload_server_and_update_etc_hosts; do
         echo "failed to resolve upload server and update /etc/hosts. will retry..."
         sleep 3
-    fi
+    done
 
     echo "scanning and uploading files..."
     cd /uploads
