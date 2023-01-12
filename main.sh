@@ -51,6 +51,13 @@ echo "using username ${username}"
 mkdir -p /root/.ssh/controlmasters
 
 # define ssh config
+#
+# NOTE I'm using a workaround for a "Host key verification failed" issue by relying on
+# beehive-upload-server's IP to be resolve and added to /etc/host. (See call to
+# resolve_upload_server_and_update_etc_hosts helper function in main loop.)
+#
+# This seems to be because our upload server ssh cert uses name "beehive-upload-server".
+# Eventually, this should be updated to use the actual hostname of the upload server.
 cat <<EOF > /root/.ssh/config
 Host beehive-upload-server
     Port ${WAGGLE_BEEHIVE_UPLOAD_PORT}
@@ -64,10 +71,6 @@ Host beehive-upload-server
     ControlMaster auto
     ControlPersist 1m
 EOF
-
-# NOTE workaround for "Host key verification failed" issue. at the moment, this seems to be because
-# our upload server ssh cert uses name "beehive-upload-server". eventually, this should be updated
-# to use the actual hostname of the upload server.
 
 # create backup of original /etc/hosts file
 # NOTE used by the resolve_upload_server_and_update_etc_hosts function below.
@@ -212,9 +215,18 @@ upload_dir() {
 }
 
 while true; do
-    if ! resolve_upload_server_and_update_etc_hosts; then
-        fatal "failed to resolve upload server and update /etc/hosts."
-    fi
+    echo "processing uploads..."
+
+    # resolve the upload server address ip
+    #
+    # NOTE We've seen a number of "unable to resolve host ip for beehive-uploads.sagecontinuum.org" in
+    # deployments. While we don't fully understand the issue yet, this will retry to address the possibility
+    # of a race condition. If it's a system level issue that requires a restart, the liveness probe will
+    # eventually take care of that.
+    while ! resolve_upload_server_and_update_etc_hosts; do
+        echo "failed to resolve upload server and update /etc/hosts. will retry..."
+        sleep 3
+    done
 
     echo "scanning and uploading files..."
     cd /uploads
